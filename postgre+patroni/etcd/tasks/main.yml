@@ -1,0 +1,112 @@
+---
+- name: Add hosts to host file 
+  template:
+    src: hosts.j2
+    dest: /etc/hosts
+
+- name: Install packages for etcd nodes
+  yum:
+    name: "{{ item.name }}"
+    state: latest
+  loop: "{{ packages }}"
+ 
+- name: Copy etcd to remote servers
+  copy: 
+    src: "etcd-v3.5.1-linux-amd64.tar.gz"
+    dest: "/tmp/etcd.tar.gz"
+
+- name: Unarchive etcd 
+  unarchive:
+    src: /tmp/etcd.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Create group for etcd
+  group:
+    name: etcd
+    state: present
+
+- name: Create user for etcd
+  user:
+    name: etcd
+    shell: /sbin/nologin
+    groups: etcd
+ 
+- name: Copy etcd to /usr/bin
+  copy:
+    src: "/tmp/etcd-v3.5.1-linux-amd64/{{ item }}"
+    dest: /usr/local/bin
+    remote_src: true
+    owner: etcd
+    group: etcd    
+    mode: u=rwx
+  loop: 
+    - etcd
+    - etcdctl
+
+- name: Delete unused files & folder
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/etcd.tar.gz"
+    - "/tmp/etcd-v3.5.1-linux-amd64"
+
+- name: Create folders for etcd
+  file: 
+    path: "{{ item }}"  
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: '0700'   
+  loop:
+    - /var/lib/etcd/
+
+- name: Add etcd firewall rule 
+  firewalld:
+    permanent: yes
+    zone: public
+    state: enabled
+    immediate: yes
+    rich_rule: rule family="ipv4" source address="{{ item }}" port protocol="tcp" port="2379" accept
+  loop:
+    - "{{ hostvars[ etcd01 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ etcd02 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ etcd03 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ postgre01 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ postgre02 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ postgre03 ]['ansible_default_ipv4']['address'] }}"
+      
+- name: Add firewall rule between etcd nodes
+  firewalld:
+    permanent: yes
+    zone: public
+    state: enabled
+    immediate: yes
+    rich_rule: rule family="ipv4" source address="{{ item }}" port protocol="tcp" port="2380" accept    
+  loop: 
+    - "{{ hostvars[ etcd01 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ etcd02 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ etcd03 ]['ansible_default_ipv4']['address'] }}"
+
+- name: Create service for etcd cluster
+  template:
+    src: etcd.j2
+    dest: /etc/systemd/system/etcd.service
+  notify:
+  - Start etcd service      
+
+- name: Enable and start etcd service
+  service: 
+    name: etcd
+    state: started
+    enabled: true
+
+- name: Check etcd cluster state
+  shell: "ETCDCTL_API=3 etcdctl -w table --endpoints={{ hostvars[ etcd01 ]['ansible_hostname'] }}:2379,{{ hostvars[ etcd02 ]['ansible_hostname'] }}:2379,{{ hostvars[ etcd03 ]['ansible_hostname'] }}:2379 endpoint status"
+  register: etcd_check
+
+- name: Debug etcd cluster state
+  debug:
+    msg: "{{ etcd_check.stdout }}"
+

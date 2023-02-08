@@ -1,0 +1,79 @@
+---
+- name: Disable default postgres module
+  shell:
+    cmd: 'yum module disable postgresql -y'
+
+- name: Install packages for postgre nodes
+  yum:
+    name: "{{ item.name }}"
+    state: latest
+  loop: "{{ packages }}"
+
+- name: Install patroni-etcd using pyhton
+  pip:
+    name: patroni[etcd]
+    executable: pip3 
+   
+- name: Check if folder exist
+  file:
+    path: /etc/patroni
+    state: directory
+
+- name: Check pg01 path and permissions
+  file:
+    path: /pg01
+    state: directory
+    mode: '0700'
+    owner: postgres
+    group: postgres
+
+- name: Set symlink for patroni
+  file: 
+    src: /usr/local/bin/patroni
+    dest: /usr/bin/patroni
+    state: link
+  ignore_errors: true
+
+- name: Add firewall rule between patroni nodes
+  firewalld:
+    permanent: yes
+    zone: public
+    state: enabled
+    immediate: yes
+    rich_rule: rule family="ipv4" source address="{{ item }}" port protocol="tcp" port="8008" accept
+  loop:
+    - "{{ hostvars[ postgre01 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ postgre02 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ postgre03 ]['ansible_default_ipv4']['address'] }}"
+
+- name: Add firewall rule for postgre
+  firewalld:
+    permanent: yes
+    zone: public
+    state: enabled
+    immediate: yes
+    rich_rule: rule family="ipv4" source address="{{ item }}" port protocol="tcp" port="5432" accept
+  loop:
+    - "{{ hostvars[ postgre01 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ postgre02 ]['ansible_default_ipv4']['address'] }}"
+    - "{{ hostvars[ postgre03 ]['ansible_default_ipv4']['address'] }}"
+
+- name: Copy patroni configuration 
+  template:
+    src: postgre.j2
+    dest: /etc/patroni/patroni.yml
+  notify: Start patroni service
+
+- name: Start patroni service
+  service: 
+    name: patroni
+    state: started
+    enabled: true
+
+- name: Check postgre cluster state
+  shell: 'patronictl -c /etc/patroni/patroni.yml list'
+  register: patroni_check
+
+- name: Debug postgre cluster state
+  debug:
+    msg: "{{ patroni_check.stdout }}"

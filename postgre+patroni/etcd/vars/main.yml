@@ -1,0 +1,6 @@
+---
+packages:
+  - name: wget
+  - name: unzip
+  - name: gzip
+  - name: tar

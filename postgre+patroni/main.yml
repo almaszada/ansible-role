@@ -1,0 +1,38 @@
+---
+- name: Postgresql High avabiliaty with Patroni
+  become: true
+  hosts: all
+  tasks:
+  - name: Set fact to hosts in inventory
+    set_fact:
+      etcd01: "{{ groups['Etcd'][0] }}"
+      etcd02: "{{ groups['Etcd'][1] }}"
+      etcd03: "{{ groups['Etcd'][2] }}"
+      haproxy01: "{{ groups['Haproxy'][0] }}"
+      postgre01: "{{ groups['Postgre'][0] }}"
+      postgre02: "{{ groups['Postgre'][1] }}"
+      postgre03: "{%if groups['Postgre'][2] is defined%}{{ groups['Postgre'][2] }}{%else%}{{ groups['Postgre'][1] }}{%endif%}"
+
+  - name: Testing 
+    debug: 
+      msg: "{%if groups['Postgre'][2] is defined%}{{ groups['Postgre'][2] }}{%else%}{{ groups['Postgre'][1] }}{%endif%}"
+
+  - name: Disable selinux
+    selinux:
+      state: disabled
+
+  - name: Setting hostname for hosts
+    hostname:
+      name: "{{ inventory_hostname }}"
+
+  - name: Setting up configurations for etcd nodes
+    include_role:
+      name: etcd
+    when: '"Etcd" in group_names'
+
+  - name: Setting up configurations for postgre nodes
+    include_role:
+      name: postgre
+    when: '"Postgre" in group_names'
+
+

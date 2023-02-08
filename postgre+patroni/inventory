@@ -1,0 +1,14 @@
+[All]
+
+[Postgre]
+postgre01 ansible_host=10.10.0.1 ansible_hostname=postgre01
+postgre02 ansible_host=10.10.0.2 ansible_hostname=postgre02
+#postgre03 ansible_host="ip_addr" ansible_hostname=postgre03 #If you will use 3rd node, you need to uncomment this line 
+
+[Etcd]
+etcd01 ansible_host=10.10.0.3 ansible_hostname=etcd01
+etcd02 ansible_host=10.10.0.4 ansible_hostname=etcd02
+etcd03 ansible_host=10.10.0.5 ansible_hostname=etcd03
+
+[Haproxy]
+haproxy01 ansible_host=10.10.0.10 ansible_hostname=haproxy01

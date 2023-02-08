@@ -1,0 +1,11 @@
+---
+packages:
+  - name: epel-release
+  - name: yum-utils
+  - name: "https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+  - name: postgresql12-server
+  - name: "@postgresql:12/client"
+  - name: postgresql12-contrib
+  - name: patroni
+  - name: certbot
+  - name: python3-etcd

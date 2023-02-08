@@ -1,0 +1,6 @@
+---
+- name: Start patroni service
+  service: 
+    name: patroni
+    enabled: true
+    state: started
